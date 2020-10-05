@@ -4,11 +4,11 @@ from torch.nn import functional as F
 import torch.utils.data
 import torch.utils.data.distributed
 from torch import autograd
-
+import diff_augment
 
 class Trainer(object):
     def __init__(self, generator, discriminator, g_optimizer, d_optimizer,
-                 gan_type, reg_type, reg_param):
+                 gan_type, reg_type, reg_param, use_diffaug):
         self.generator = generator
         self.discriminator = discriminator
         self.g_optimizer = g_optimizer
@@ -17,6 +17,8 @@ class Trainer(object):
         self.gan_type = gan_type
         self.reg_type = reg_type
         self.reg_param = reg_param
+        self.use_diffaug = use_diffaug
+        self.policy = 'color,translation,cutout'
 
     def generator_trainstep(self, z,**kwargs):
         toggle_grad(self.generator, True)
@@ -26,6 +28,8 @@ class Trainer(object):
         self.g_optimizer.zero_grad()
 
         x_fake = self.generator(z,**kwargs)
+        if self.use_diffaug:
+            x_fake = diff_augment.DiffAugment(x_fake,self.policy)
         d_fake = self.discriminator(x_fake,**kwargs)
         gloss = self.compute_loss(d_fake, 1)
         gloss.backward()
@@ -43,8 +47,12 @@ class Trainer(object):
 
         # On real data
         x_real.requires_grad_()
-
-        d_real = self.discriminator(x_real,**kwargs)
+        if self.use_diffaug:
+            x_real_aug = diff_augment.DiffAugment(x_real,self.policy)
+        else:
+            x_real_aug = x_real
+             
+        d_real = self.discriminator(x_real_aug,**kwargs)
         dloss_real = self.compute_loss(d_real, 1)
 
         if self.reg_type == 'real':
@@ -59,7 +67,11 @@ class Trainer(object):
             x_fake = self.generator(z,**kwargs)
 
         x_fake.requires_grad_()
-        d_fake = self.discriminator(x_fake,**kwargs)
+        if self.use_diffaug:
+            x_fake_aug = diff_augment.DiffAugment(x_fake,self.policy)
+        else:
+            x_fake_aug = x_real
+        d_fake = self.discriminator(x_fake_aug,**kwargs)
         dloss_fake = self.compute_loss(d_fake, 0)
 
         if self.reg_type == 'fake':

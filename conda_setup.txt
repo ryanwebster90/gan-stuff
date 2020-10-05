@@ -1,0 +1,4 @@
+conda install -c anaconda git
+conda install -c anaconda wget
+conda install -c conda-forge matplotlib
+pip install scipy

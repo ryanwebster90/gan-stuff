@@ -1,0 +1,5 @@
+root: ffhq_256
+batchsize: 8
+lr: .0001
+size: 256
+diffaug: 0
